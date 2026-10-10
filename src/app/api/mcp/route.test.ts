@@ -199,14 +199,16 @@ describe('typesafe_ask', () => {
 		expect(apiCalls).toHaveLength(0);
 	});
 
-	it('refuses a missing, null or "null" state without calling TypeSafe', async () => {
+	it('refuses a missing, null, "null" or wrongly typed state without calling TypeSafe', async () => {
 		const missing = await call('typesafe_ask', { questions: QUESTIONS });
 		const nothing = await call('typesafe_ask', { state: null, questions: QUESTIONS });
 		const nullText = await call('typesafe_ask', { state: 'null', questions: QUESTIONS });
+		const number = await call('typesafe_ask', { state: 42, questions: QUESTIONS });
 
 		expect(missing).toEqual({ isError: true, text: expect.stringContaining('state: Required') });
-		expect(nothing).toEqual({ isError: true, text: expect.stringContaining('state: Must be text, an object or an array') });
-		expect(nullText).toEqual({ isError: true, text: expect.stringContaining('state: Must not be empty') });
+		expect(nothing).toEqual({ isError: true, text: expect.stringContaining('state: Must not be empty or null') });
+		expect(nullText).toEqual({ isError: true, text: expect.stringContaining('state: Must not be empty or null') });
+		expect(number).toEqual({ isError: true, text: expect.stringContaining('state: Must be text, an object or an array') });
 		expect(apiCalls).toHaveLength(0);
 	});
 
@@ -322,6 +324,15 @@ describe('typesafe_ask_batch', () => {
 
 		expect(isError).toBe(true);
 		expect(text).toContain('Every state is empty');
+		expect(apiCalls).toHaveLength(0);
+	});
+
+	it('says that missing states or questions are required', async () => {
+		const noStates = await call('typesafe_ask_batch', { questions: QUESTIONS });
+		const noQuestions = await call('typesafe_ask_batch', { states: ['a'] });
+
+		expect(noStates).toEqual({ isError: true, text: expect.stringContaining('states: Required') });
+		expect(noQuestions).toEqual({ isError: true, text: expect.stringContaining('questions: Required') });
 		expect(apiCalls).toHaveLength(0);
 	});
 

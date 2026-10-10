@@ -22,13 +22,15 @@ export function isEmptyState(state: unknown): boolean {
 	return !hasContent(state) || (typeof state === 'string' && state.trim() === 'null');
 }
 
+// zod reports a missing field as one of the wrong type, which doesn't tell the
+// caller that it is missing.
+export const requiredOr = (message: string) => (issue: { input?: unknown }) =>
+	(issue.input === undefined ? 'Required' : message);
+
 // TypeSafe takes text, an object or an array wherever it takes content. That is
 // checked here and left out of the schema clients load, where it would repeat
 // for every field.
-const entry = z.unknown().refine(isEntry, {
-	error: issue => (issue.input === undefined ? 'Required' : 'Must be text, an object or an array'),
-	abort: true,
-});
+const entry = z.unknown().refine(isEntry, { error: requiredOr('Must be text, an object or an array'), abort: true });
 
 // TypeSafe answers an empty state or question with a plausible-looking
 // probability, which would hide the mistake that left it empty.
@@ -45,7 +47,16 @@ const STATE_DESCRIPTION
 	+ 'model sees nothing else. Work out dates, sums and exact comparisons yourself, include the results and '
 	+ 'point the question at them.';
 
-export const stateSchema = entry.refine(state => !isEmptyState(state), 'Must not be empty').describe(STATE_DESCRIPTION);
+// null passes the type check so that it gets the same message as the text
+// "null": clients send a missing state either way.
+export const stateSchema = z
+	.unknown()
+	.refine(state => state === null || isEntry(state), {
+		error: requiredOr('Must be text, an object or an array'),
+		abort: true,
+	})
+	.refine(state => !isEmptyState(state), 'Must not be empty or null')
+	.describe(STATE_DESCRIPTION);
 
 // An empty or null item in a batch is reported in its own slot rather than
 // failing the whole call, so it is let through here.
@@ -125,7 +136,9 @@ const score = z
 	);
 
 export const questionsSchema = z
-	.record(z.string(), z.discriminatedUnion('type', [noul, choice, score]))
+	.record(z.string(), z.discriminatedUnion('type', [noul, choice, score]), {
+		error: requiredOr('Must be an object of questions keyed by name'),
+	})
 	.refine(questions => Object.keys(questions).length > 0, 'Ask at least one question')
 	.meta({ minProperties: 1 })
 	.describe(

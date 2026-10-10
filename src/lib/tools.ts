@@ -1,7 +1,7 @@
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import type { EntryType, Questions } from '@typesafe-ai/sdk';
 import { z } from 'zod';
-import { batchStateSchema, isEmptyState, modelSchema, questionsSchema, stateSchema } from '@/lib/questions';
+import { batchStateSchema, isEmptyState, modelSchema, questionsSchema, requiredOr, stateSchema } from '@/lib/questions';
 import { ask, askBatch, describeError, listModels, MAX_BATCH_STATES } from '@/lib/systemOne';
 
 // Leaves time to answer within the route's 60 second limit. Even a single
@@ -41,7 +41,8 @@ If the first state fails in a way that every state would, for example because a 
 
 const LIST_MODELS_DESCRIPTION
 	= 'List the TypeSafe models this server can use, with their descriptions and release dates, and '
-	+ '`default_model`, the one used when `model` is left out. Pass one of the names as `model` to the other tools.';
+	+ '`default_model`, the one used when `model` is left out. Pass one of the names as `model` to the other '
+	+ 'tools. Names can point to the same version; each answer\'s `model` field shows which version answered.';
 
 // Asking has no side effects beyond the tokens it uses, so every tool is safe to repeat.
 const READ_ONLY = { readOnlyHint: true, idempotentHint: true, openWorldHint: true };
@@ -70,7 +71,7 @@ export function registerTools(server: McpServer): void {
 			description: ASK_BATCH_DESCRIPTION,
 			inputSchema: z.strictObject({
 				states: z
-					.array(batchStateSchema)
+					.array(batchStateSchema, { error: requiredOr('Must be a list of states') })
 					.min(1, { error: 'Send at least one state', abort: true })
 					.max(MAX_BATCH_STATES, `Send at most ${MAX_BATCH_STATES} states; split a longer list across calls`)
 					.refine(states => !states.every(isEmptyState), 'Every state is empty; there is nothing to judge')
