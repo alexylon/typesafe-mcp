@@ -21,6 +21,8 @@ const QUESTION_TYPES = 'Question types: noul, a yes/no question that returns the
 	+ 'picks one of the options you define; and score, a position on ordered levels you describe. The input '
 	+ 'schema says more about each.';
 
+const TIES = 'Repeat calls can give slightly different numbers, so treat close values as ties.';
+
 // claude.ai cuts a tool description off at 2,048 characters, so what each
 // question type means is described in the input schema instead.
 const ASK_DESCRIPTION = `Ask TypeSafe's Jev model typed questions about a piece of content and get probabilities back instead of generated text. Use it to classify, route, check a yes/no condition, grade against a rubric, score relevance, or check a claim against its evidence. ${QUESTION_TYPES}
@@ -29,9 +31,9 @@ Put everything the questions need in \`state\`. Ask the independent questions ab
 
 Keep each question to one narrow judgment: split independent dimensions into separate questions, but don't split a judgment about how two things relate. Narrow doesn't mean literal or one sentence: interpreting something in context or choosing the next action is one judgment.
 
-The answers are judgments, not facts, and repeat calls can differ by a few hundredths. Several fitting options lower \`confidence\`, which is fine when any of them would do. How sure an answer must be depends on what's at stake: check the uncertain ones that matter yourself, or flag them to the user. When an answer looks wrong, first make sure the state held the evidence and the question said what you meant.`;
+The answers are judgments, not facts. ${TIES} Several fitting options lower \`confidence\`, which is fine when any of them would do. How sure an answer must be depends on what's at stake: check the uncertain ones that matter yourself, or flag them to the user. When an answer looks wrong, first make sure the state held the evidence and the question said what you meant.`;
 
-const ASK_BATCH_DESCRIPTION = `Ask the same questions about many states in one call, for example to classify or score a list of items. Each state is judged on its own, exactly as typesafe_ask would judge it, so scores from the same question can rank the items; treat differences of a few hundredths as ties. ${QUESTION_TYPES} typesafe_ask's description explains how to write the questions. Takes up to ${MAX_BATCH_STATES} states; split a longer list across calls. Each state goes to TypeSafe as its own request with all the questions, so a batch costs about as much as that many single calls.
+const ASK_BATCH_DESCRIPTION = `Ask the same questions about many states in one call, for example to classify or score a list of items. Each state is judged on its own, exactly as typesafe_ask would judge it, so scores from the same question can rank the items. ${TIES} ${QUESTION_TYPES} typesafe_ask's description explains how to write the questions. Takes up to ${MAX_BATCH_STATES} states; split a longer list across calls. Each state goes to TypeSafe as its own request with all the questions, so a batch costs about as much as that many single calls.
 
 Results come back in input order as {index, answers} or {index, error}. Answers are compact: \`noul\`, or \`choice\` or \`score\` with \`confidence\`. Set \`include_probabilities\` to also get the probability of every option or level.
 
@@ -69,8 +71,8 @@ export function registerTools(server: McpServer): void {
 			inputSchema: z.strictObject({
 				states: z
 					.array(batchStateSchema)
-					.min(1)
-					.max(MAX_BATCH_STATES)
+					.min(1, { error: 'Send at least one state', abort: true })
+					.max(MAX_BATCH_STATES, `Send at most ${MAX_BATCH_STATES} states; split a longer list across calls`)
 					.refine(states => states.some(hasContent), 'Every state is empty; there is nothing to judge')
 					.describe('The items to judge. Each one is a complete state for the questions.'),
 				questions: questionsSchema,

@@ -292,6 +292,14 @@ describe('typesafe_ask_batch', () => {
 		expect(apiCalls).toHaveLength(0);
 	});
 
+	it('answers an empty list of states with a single message', async () => {
+		const { isError, text } = await call('typesafe_ask_batch', { states: [], questions: QUESTIONS });
+
+		expect(isError).toBe(true);
+		expect(text).toContain('Send at least one state');
+		expect(text).not.toContain('Every state is empty');
+	});
+
 	it('stops after the first state when TypeSafe rejects it', async () => {
 		const { isError, text } = await call('typesafe_ask_batch', { states: ['reject', 'b', 'c'], questions: QUESTIONS });
 
@@ -376,7 +384,7 @@ describe('typesafe_ask_batch', () => {
 		});
 
 		expect(isError).toBe(true);
-		expect(text).toContain('states');
+		expect(text).toContain('Send at most 100 states');
 		expect(apiCalls).toHaveLength(0);
 	});
 });

@@ -41,6 +41,22 @@ describe('questionsSchema', () => {
 		expect(accepts({ q: { type: 'choice', instructions: 'Which one?', criteria: { '  ': null, other: null } } })).toBe(false);
 	});
 
+	it('explains criteria that are missing, the wrong type or the wrong size', () => {
+		const messages = (questions: unknown) => questionsSchema.safeParse(questions).error?.issues.map(issue => issue.message);
+		const levels = (count: number) => Array.from({ length: count }, (_, i) => `Level ${i}`);
+
+		expect(messages({ q: { type: 'choice', instructions: 'Which one?' } }))
+			.toEqual(['Choice criteria must be an object of option names and descriptions']);
+		expect(messages({ q: { type: 'choice', instructions: 'Which one?', criteria: ['refund', 'exchange'] } }))
+			.toEqual(['Choice criteria must be an object of option names and descriptions']);
+		expect(messages({ q: { type: 'score', instructions: 'How much?' } }))
+			.toEqual(['Score criteria must be a list of level descriptions, lowest first']);
+		expect(messages({ q: { type: 'score', instructions: 'How much?', criteria: levels(1) } }))
+			.toEqual(['A score needs at least 2 levels']);
+		expect(messages({ q: { type: 'score', instructions: 'How much?', criteria: levels(11) } }))
+			.toEqual(['A score takes at most 10 levels']);
+	});
+
 	it('refuses an empty score level', () => {
 		expect(accepts({ q: { type: 'score', instructions: 'How much?', criteria: ['', 'High'] } })).toBe(false);
 	});

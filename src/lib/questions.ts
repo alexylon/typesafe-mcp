@@ -33,7 +33,8 @@ const STATE_DESCRIPTION
 	= 'The content to judge: plain text, or an object or array; not empty. When it has several parts, give '
 	+ 'each a named field, such as a ticket next to the policy that applies to it. Include everything the '
 	+ 'questions need, such as who is involved, how they relate and current facts like today\'s date: the '
-	+ 'model sees nothing else. Work out dates, sums and exact comparisons yourself and include the results.';
+	+ 'model sees nothing else. Work out dates, sums and exact comparisons yourself, include the results and '
+	+ 'point the question at them.';
 
 export const stateSchema = filledEntry.describe(STATE_DESCRIPTION);
 
@@ -72,7 +73,9 @@ const choice = z
 		type: z.literal('choice'),
 		instructions,
 		criteria: z
-			.record(z.string(), optionDescription)
+			.record(z.string(), optionDescription, {
+				error: 'Choice criteria must be an object of option names and descriptions',
+			})
 			.refine(options => Object.keys(options).length >= 2, 'A choice needs at least 2 options')
 			.refine(
 				options => Object.keys(options).length <= MAX_CHOICE_OPTIONS,
@@ -98,9 +101,9 @@ const score = z
 		type: z.literal('score'),
 		instructions,
 		criteria: z
-			.array(filledEntry)
-			.min(2)
-			.max(MAX_SCORE_LEVELS)
+			.array(filledEntry, { error: 'Score criteria must be a list of level descriptions, lowest first' })
+			.min(2, 'A score needs at least 2 levels')
+			.max(MAX_SCORE_LEVELS, `A score takes at most ${MAX_SCORE_LEVELS} levels`)
 			.describe(
 				'Level descriptions in order, lowest first. The score is a level index starting at 0. '
 				+ 'Describe each level as a concrete situation that makes sense on its own.',
