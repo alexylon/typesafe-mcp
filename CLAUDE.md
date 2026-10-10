@@ -16,7 +16,8 @@ npm run smoke        # real MCP client against a running server; makes real Type
 ```
 
 Run test, lint, type-check and build before calling a change done. `npm run smoke` needs a server
-running and `TYPESAFE_API_KEY` in its environment; it reads `MCP_AUTH_TOKEN` from `.env.local`.
+running and `TYPESAFE_API_KEY` in its environment. It takes `MCP_AUTH_TOKEN` and `MCP_URL` from the
+environment or `.env.local`; without `MCP_URL` it targets `http://localhost:3000/api/mcp`.
 
 ## Layout
 
@@ -61,15 +62,14 @@ running and `TYPESAFE_API_KEY` in its environment; it reads `MCP_AUTH_TOKEN` fro
 
 ## Status (2026-10-10)
 
-Built and verified locally: tests, lint, type-check and build pass, and `npm run smoke` passes against
-both `next dev` and `next start` with the live TypeSafe API. Not deployed yet.
+Deployed to Vercel (Hobby plan); every push to `main` deploys to production. Tests, lint, type-check
+and build pass, and `npm run smoke` passes against `next dev`, `next start` and production with the
+live TypeSafe API.
 
 Next steps:
 
-1. Deploy to Vercel with `TYPESAFE_API_KEY` and `MCP_AUTH_TOKEN` set, then run the smoke script
-   against the production URL.
-2. Add the connector in Claude and check that the dialog offers "Request headers".
-3. If it doesn't, add OAuth. What Claude needs is in
+1. Add the connector in Claude and check that the dialog offers "Request headers".
+2. If it doesn't, add OAuth. What Claude needs is in
    https://claude.com/docs/connectors/building/authentication: a `401` whose `WWW-Authenticate` points
    at protected resource metadata, an authorization server with PKCE (S256) and either dynamic client
    registration or Client ID Metadata Documents, and the redirect URI
