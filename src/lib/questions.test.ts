@@ -19,6 +19,8 @@ describe('questionsSchema', () => {
 
 	it('refuses a question without instructions or with an unknown type', () => {
 		expect(accepts({ q: { type: 'noul' } })).toBe(false);
+		expect(accepts({ q: { type: 'noul', instructions: '' } })).toBe(false);
+		expect(accepts({ q: { type: 'noul', instructions: {} } })).toBe(false);
 		expect(accepts({ q: { type: 'noul', instructions: 42 } })).toBe(false);
 		expect(accepts({ q: { type: 'ranking', instructions: 'Which is best?' } })).toBe(false);
 	});
@@ -32,6 +34,15 @@ describe('questionsSchema', () => {
 		expect(accepts(withLevels(2))).toBe(true);
 		expect(accepts(withLevels(10))).toBe(true);
 		expect(accepts(withLevels(11))).toBe(false);
+	});
+
+	it('refuses an empty option name', () => {
+		expect(accepts({ q: { type: 'choice', instructions: 'Which one?', criteria: { '': null, other: null } } })).toBe(false);
+		expect(accepts({ q: { type: 'choice', instructions: 'Which one?', criteria: { '  ': null, other: null } } })).toBe(false);
+	});
+
+	it('refuses an empty score level', () => {
+		expect(accepts({ q: { type: 'score', instructions: 'How much?', criteria: ['', 'High'] } })).toBe(false);
 	});
 
 	it('holds a choice to between 2 and 255 options', () => {
@@ -64,5 +75,13 @@ describe('stateSchema', () => {
 		for (const state of [42, true, null, undefined]) {
 			expect(stateSchema.safeParse(state).success).toBe(false);
 		}
+	});
+
+	it('refuses a state with nothing in it, at any depth', () => {
+		for (const state of ['', '   ', {}, [], { ticket: '' }, { ticket: { body: ' ' } }, ['  '], [null]]) {
+			expect(stateSchema.safeParse(state).success).toBe(false);
+		}
+
+		expect(stateSchema.safeParse({ amount: 0 }).success).toBe(true);
 	});
 });

@@ -12,7 +12,7 @@ Vercel, and it is not an official TypeSafe project.
 | --- | --- |
 | `typesafe_ask` | Asks one or more questions about one state and returns the full answers. |
 | `typesafe_ask_batch` | Asks the same questions about up to 100 states and returns compact answers in input order. |
-| `typesafe_list_models` | Lists the models the API key can use. |
+| `typesafe_list_models` | Lists the models the API key can use, and which one is the default. |
 
 A question is one of three types, as in the [TypeSafe API](https://docs.typesafe.ai/api):
 
@@ -95,7 +95,9 @@ claude mcp add --transport http typesafe https://<your-domain>/api/mcp \
 - A request without a valid token gets `401` before it reaches the MCP handler. If `MCP_AUTH_TOKEN` is
   unset or shorter than 32 characters, every request gets `503`.
 - A problem with a call (invalid arguments, a TypeSafe error) comes back as a tool error that says what
-  to fix.
+  to fix. Empty input counts as invalid (a state, instructions, a score level or an option name with
+  nothing in it), since TypeSafe would still answer it. In a batch, an empty state only fails its own
+  slot, unless every state is empty.
 - Every call stops asking TypeSafe after 50 seconds, to answer within the route's 60 second limit, and
   as soon as the client disconnects. A call that runs out of time comes back with an error and can be
   sent again.

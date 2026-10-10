@@ -9,11 +9,13 @@ import {
 	type SystemOneResult,
 	type Usage,
 } from '@typesafe-ai/sdk';
+import { hasContent } from '@/lib/questions';
 
 export const MAX_BATCH_STATES = 100;
 
 const BATCH_CONCURRENCY = 8;
 const OUT_OF_TIME = 'Not answered within the time budget; send it again';
+const EMPTY_STATE = 'The state is empty; send it again with the content to judge';
 
 type Answer = SystemOneResult<Questions>['answers'][string];
 
@@ -33,24 +35,27 @@ export interface BatchResult {
 	usage: Usage;
 }
 
-let client: TypeSafeClient | undefined;
+let cachedClient: TypeSafeClient | undefined;
 
 // Created on first use, so a missing API key fails the tool call and not the build.
 function typesafe(): TypeSafeClient {
-	return (client ??= new TypeSafeClient());
+	return (cachedClient ??= new TypeSafeClient());
 }
 
 export function ask(state: EntryType, questions: Questions, model?: string, signal?: AbortSignal) {
 	return typesafe().systemOne({ state, questions, model }, { signal });
 }
 
-export function listModels(signal?: AbortSignal) {
-	return typesafe().models.list({ signal });
+export async function listModels(signal?: AbortSignal) {
+	const client = typesafe();
+
+	return { models: await client.models.list({ signal }), default_model: client.defaultModel };
 }
 
 // Asks the same questions about every state, a few states at a time. One state
-// failing doesn't stop the others; its error is reported in its place. Once the
-// signal fires, the states not answered yet are reported as out of time.
+// failing doesn't stop the others; its error is reported in its place, and an
+// empty state is never sent. Once the signal fires, the states not answered yet
+// are reported as out of time.
 export async function askBatch(
 	states: EntryType[],
 	questions: Questions,
@@ -76,15 +81,22 @@ export async function askBatch(
 		}
 	}
 
+	const toAsk: number[] = [];
+
+	for (const [index, state] of states.entries()) {
+		if (hasContent(state)) toAsk.push(index);
+		else results[index] = { index, error: EMPTY_STATE };
+	}
+
 	// The first state goes alone, so a problem every state would hit, such as a
 	// malformed question or a missing API key, fails once instead of 100 times.
-	await answer(0, true);
+	if (toAsk.length > 0) await answer(toAsk[0], true);
 
 	let next = 1;
 
 	async function worker(): Promise<void> {
-		while (next < states.length) {
-			const index = next++;
+		while (next < toAsk.length) {
+			const index = toAsk[next++];
 
 			if (signal.aborted) results[index] = { index, error: OUT_OF_TIME };
 			else await answer(index);

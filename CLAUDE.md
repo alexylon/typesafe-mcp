@@ -50,6 +50,14 @@ environment or `.env.local`; without `MCP_URL` it targets `http://localhost:3000
   the caller's own criteria for every item.
 - **Question objects are strict.** An unknown key is an error rather than being dropped, because a
   dropped key (noul criteria written as `yes`/`no`, say) changes the answer without anyone noticing.
+- **Empty input is refused**: a state, instructions or a score level with nothing in it at any depth
+  (`{ ticket: '' }` counts), and an empty option name. TypeSafe would answer it with plausible-looking
+  probabilities, which hides the mistake. In a batch, an empty state gets an error in its own slot
+  instead of failing the call, unless every state is empty.
+- **Descriptions stay under 2,048 characters**, where claude.ai cuts them off; a test checks this. What
+  each question type means is described in that type's part of the schema, so both ask tools carry it.
+- **claude.ai doesn't pass server instructions to its model** (Claude Code does), so anything a caller
+  needs is also in a tool or parameter description.
 - **The first state of a batch is sent alone**, so a malformed question, a missing API key or a failed
   connection fails once instead of 100 times. A busy or slow API (408, 429, 5xx, a timeout) doesn't
   stop the batch, since a single heavy state can time out on its own.

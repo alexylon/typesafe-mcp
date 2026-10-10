@@ -23,6 +23,8 @@ const ANSWERS = {
 	tone: { type: 'score', score: 0.2, confidence: 0.7, legend: { 0: 'Calm', 1: 'Angry' }, probabilities: { 0: 0.8, 1: 0.2 } },
 };
 
+const MODELS = [{ name: 'jev-latest', description: 'The latest Jev', release_date: '2026-09-10T00:00:00Z' }];
+
 interface ApiCall {
 	url: string;
 	authorization: string | null;
@@ -38,6 +40,8 @@ let maxInFlight: number;
 // "busy" a 408, "limited" a 429 with a one-minute Retry-After, "unreachable" a
 // connection failure and "slow" a long pause.
 async function fakeTypeSafe(url: string, init: RequestInit): Promise<Response> {
+	if (url.endsWith('/v1/models')) return Response.json({ models: MODELS });
+
 	const body = JSON.parse(String(init.body));
 
 	apiCalls.push({ url, authorization: new Headers(init.headers).get('authorization'), body });
@@ -85,6 +89,13 @@ async function call(name: string, args: Record<string, unknown>, post = POST) {
 	return { isError: result.isError === true, text: block.text };
 }
 
+function descriptionsIn(schema: unknown): string[] {
+	if (typeof schema !== 'object' || schema === null) return [];
+
+	return Object.entries(schema).flatMap(([key, value]) =>
+		key === 'description' && typeof value === 'string' ? [value] : descriptionsIn(value));
+}
+
 function shortenTimeBudget(ms: number): void {
 	const timeout = AbortSignal.timeout.bind(AbortSignal);
 
@@ -122,6 +133,39 @@ describe('access', () => {
 	});
 });
 
+describe('tool definitions', () => {
+	it('keeps every description short enough for claude.ai to show in full', async () => {
+		const { tools } = await (await connect()).listTools();
+		const descriptions = tools.flatMap(tool => [tool.description ?? '', ...descriptionsIn(tool.inputSchema)]);
+
+		expect(descriptions.length).toBeGreaterThan(10);
+		for (const description of descriptions) expect(description.length).toBeLessThan(2048);
+	});
+
+	it('states the question and option counts that the server checks', async () => {
+		const { tools } = await (await connect()).listTools();
+		const askTool = tools.find(tool => tool.name === 'typesafe_ask');
+
+		expect(askTool?.inputSchema).toMatchObject({
+			properties: {
+				questions: {
+					minProperties: 1,
+					additionalProperties: {
+						oneOf: expect.arrayContaining([
+							expect.objectContaining({
+								properties: expect.objectContaining({
+									type: expect.objectContaining({ const: 'choice' }),
+									criteria: expect.objectContaining({ minProperties: 2, maxProperties: 255 }),
+								}),
+							}),
+						]),
+					},
+				},
+			},
+		});
+	});
+});
+
 describe('typesafe_ask', () => {
 	it('sends the state and questions to TypeSafe with the server key and returns the full answers', async () => {
 		const { isError, text } = await call('typesafe_ask', { state: { ticket: 'Charged twice' }, questions: QUESTIONS });
@@ -152,6 +196,14 @@ describe('typesafe_ask', () => {
 
 		expect(isError).toBe(true);
 		expect(text).toContain('questions.tone.criteria');
+		expect(apiCalls).toHaveLength(0);
+	});
+
+	it('refuses an empty state without calling TypeSafe', async () => {
+		const { isError, text } = await call('typesafe_ask', { state: '', questions: QUESTIONS });
+
+		expect(isError).toBe(true);
+		expect(text).toContain('Must not be empty');
 		expect(apiCalls).toHaveLength(0);
 	});
 
@@ -215,6 +267,29 @@ describe('typesafe_ask_batch', () => {
 		expect(batch.results[1]).toEqual({ index: 1, error: 'TypeSafe answered HTTP 422 state is not acceptable' });
 		expect(batch.results[0].answers).toBeDefined();
 		expect(batch.results[2].answers).toBeDefined();
+	});
+
+	it('reports an empty state in its place without sending it', async () => {
+		const { isError, text } = await call('typesafe_ask_batch', {
+			states: ['', 'b', { ticket: { body: ' ' } }, 'd'],
+			questions: QUESTIONS,
+		});
+		const batch = JSON.parse(text);
+		const empty = 'The state is empty; send it again with the content to judge';
+
+		expect(isError).toBe(false);
+		expect(batch.failed).toBe(2);
+		expect(batch.results[0]).toEqual({ index: 0, error: empty });
+		expect(batch.results[2]).toEqual({ index: 2, error: empty });
+		expect(apiCalls.map(apiCall => apiCall.body.state)).toEqual(['b', 'd']);
+	});
+
+	it('refuses a batch in which every state is empty', async () => {
+		const { isError, text } = await call('typesafe_ask_batch', { states: ['', { ticket: '' }], questions: QUESTIONS });
+
+		expect(isError).toBe(true);
+		expect(text).toContain('Every state is empty');
+		expect(apiCalls).toHaveLength(0);
 	});
 
 	it('stops after the first state when TypeSafe rejects it', async () => {
@@ -303,5 +378,14 @@ describe('typesafe_ask_batch', () => {
 		expect(isError).toBe(true);
 		expect(text).toContain('states');
 		expect(apiCalls).toHaveLength(0);
+	});
+});
+
+describe('typesafe_list_models', () => {
+	it('lists the models and names the default', async () => {
+		const { isError, text } = await call('typesafe_list_models', {});
+
+		expect(isError).toBe(false);
+		expect(JSON.parse(text)).toEqual({ models: MODELS, default_model: 'jev-latest' });
 	});
 });
