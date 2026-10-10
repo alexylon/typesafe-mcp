@@ -199,6 +199,17 @@ describe('typesafe_ask', () => {
 		expect(apiCalls).toHaveLength(0);
 	});
 
+	it('refuses a missing, null or "null" state without calling TypeSafe', async () => {
+		const missing = await call('typesafe_ask', { questions: QUESTIONS });
+		const nothing = await call('typesafe_ask', { state: null, questions: QUESTIONS });
+		const nullText = await call('typesafe_ask', { state: 'null', questions: QUESTIONS });
+
+		expect(missing).toEqual({ isError: true, text: expect.stringContaining('state: Required') });
+		expect(nothing).toEqual({ isError: true, text: expect.stringContaining('state: Must be text, an object or an array') });
+		expect(nullText).toEqual({ isError: true, text: expect.stringContaining('state: Must not be empty') });
+		expect(apiCalls).toHaveLength(0);
+	});
+
 	it('refuses an empty state without calling TypeSafe', async () => {
 		const { isError, text } = await call('typesafe_ask', { state: '', questions: QUESTIONS });
 
@@ -282,6 +293,28 @@ describe('typesafe_ask_batch', () => {
 		expect(batch.results[0]).toEqual({ index: 0, error: empty });
 		expect(batch.results[2]).toEqual({ index: 2, error: empty });
 		expect(apiCalls.map(apiCall => apiCall.body.state)).toEqual(['b', 'd']);
+	});
+
+	it('treats a null or "null" item as empty, but sends "null" inside an item', async () => {
+		const { isError, text } = await call('typesafe_ask_batch', {
+			states: [null, 'b', 'null', { value: 'null' }],
+			questions: QUESTIONS,
+		});
+		const batch = JSON.parse(text);
+
+		expect(isError).toBe(false);
+		expect(batch.failed).toBe(2);
+		expect(batch.results[0].error).toContain('The state is empty');
+		expect(batch.results[2].error).toContain('The state is empty');
+		expect(apiCalls.map(apiCall => apiCall.body.state)).toEqual(['b', { value: 'null' }]);
+	});
+
+	it('refuses a batch with an item of the wrong type', async () => {
+		const { isError, text } = await call('typesafe_ask_batch', { states: ['a', 5], questions: QUESTIONS });
+
+		expect(isError).toBe(true);
+		expect(text).toContain('states.1: Must be text, an object, an array or null');
+		expect(apiCalls).toHaveLength(0);
 	});
 
 	it('refuses a batch in which every state is empty', async () => {

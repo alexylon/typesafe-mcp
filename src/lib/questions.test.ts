@@ -57,6 +57,14 @@ describe('questionsSchema', () => {
 			.toEqual(['A score takes at most 10 levels']);
 	});
 
+	it('says that missing instructions are required', () => {
+		expect(questionsSchema.safeParse({ q: { type: 'noul' } }).error?.issues.map(issue => issue.message)).toEqual(['Required']);
+	});
+
+	it('takes the word "null" as written inside a question', () => {
+		expect(accepts({ q: { type: 'score', instructions: 'How many values are set?', criteria: ['null', 'some', 'all'] } })).toBe(true);
+	});
+
 	it('refuses an empty score level', () => {
 		expect(accepts({ q: { type: 'score', instructions: 'How much?', criteria: ['', 'High'] } })).toBe(false);
 	});
@@ -99,5 +107,11 @@ describe('stateSchema', () => {
 		}
 
 		expect(stateSchema.safeParse({ amount: 0 }).success).toBe(true);
+	});
+
+	it('refuses a state that is just the text "null", but not "null" inside one', () => {
+		expect(stateSchema.safeParse('null').success).toBe(false);
+		expect(stateSchema.safeParse(' null ').success).toBe(false);
+		expect(stateSchema.safeParse({ expression: 'null' }).success).toBe(true);
 	});
 });

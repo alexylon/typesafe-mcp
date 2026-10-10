@@ -9,23 +9,32 @@ const isEntry = (value: unknown): boolean =>
 
 // True when there is something to judge at any depth. `{ ticket: '' }` has
 // nothing, but a blank field next to filled ones is normal data.
-export function hasContent(value: unknown): boolean {
+function hasContent(value: unknown): boolean {
 	if (typeof value === 'string') return value.trim() !== '';
 	if (typeof value === 'object' && value !== null) return Object.values(value).some(hasContent);
 
 	return typeof value === 'number' || typeof value === 'boolean';
 }
 
+// Clients send a missing state as the text "null", so a state that is only that
+// word counts as empty too. Values inside a state arrive as written.
+export function isEmptyState(state: unknown): boolean {
+	return !hasContent(state) || (typeof state === 'string' && state.trim() === 'null');
+}
+
 // TypeSafe takes text, an object or an array wherever it takes content. That is
 // checked here and left out of the schema clients load, where it would repeat
 // for every field.
-const entry = z.unknown().refine(isEntry, { message: 'Must be text, an object or an array', abort: true });
+const entry = z.unknown().refine(isEntry, {
+	error: issue => (issue.input === undefined ? 'Required' : 'Must be text, an object or an array'),
+	abort: true,
+});
 
 // TypeSafe answers an empty state or question with a plausible-looking
 // probability, which would hide the mistake that left it empty.
 const filledEntry = entry.refine(hasContent, 'Must not be empty');
 
-const optionDescription = z
+const entryOrNull = z
 	.unknown()
 	.refine(value => value === null || isEntry(value), 'Must be text, an object, an array or null');
 
@@ -36,11 +45,11 @@ const STATE_DESCRIPTION
 	+ 'model sees nothing else. Work out dates, sums and exact comparisons yourself, include the results and '
 	+ 'point the question at them.';
 
-export const stateSchema = filledEntry.describe(STATE_DESCRIPTION);
+export const stateSchema = entry.refine(state => !isEmptyState(state), 'Must not be empty').describe(STATE_DESCRIPTION);
 
-// An empty item in a batch is reported in its own slot rather than failing the
-// whole call, so it is let through here.
-export const batchStateSchema = entry.describe(STATE_DESCRIPTION);
+// An empty or null item in a batch is reported in its own slot rather than
+// failing the whole call, so it is let through here.
+export const batchStateSchema = entryOrNull.describe(STATE_DESCRIPTION);
 
 // Clients see this once per question type, so advice for every question goes in
 // the `questions` description instead.
@@ -73,7 +82,7 @@ const choice = z
 		type: z.literal('choice'),
 		instructions,
 		criteria: z
-			.record(z.string(), optionDescription, {
+			.record(z.string(), entryOrNull, {
 				error: 'Choice criteria must be an object of option names and descriptions',
 			})
 			.refine(options => Object.keys(options).length >= 2, 'A choice needs at least 2 options')

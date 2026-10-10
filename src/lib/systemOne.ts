@@ -9,7 +9,7 @@ import {
 	type SystemOneResult,
 	type Usage,
 } from '@typesafe-ai/sdk';
-import { hasContent } from '@/lib/questions';
+import { isEmptyState } from '@/lib/questions';
 
 export const MAX_BATCH_STATES = 100;
 
@@ -84,7 +84,7 @@ export async function askBatch(
 	const toAsk: number[] = [];
 
 	for (const [index, state] of states.entries()) {
-		if (hasContent(state)) toAsk.push(index);
+		if (!isEmptyState(state)) toAsk.push(index);
 		else results[index] = { index, error: EMPTY_STATE };
 	}
 

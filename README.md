@@ -95,9 +95,9 @@ claude mcp add --transport http typesafe https://<your-domain>/api/mcp \
 - A request without a valid token gets `401` before it reaches the MCP handler. If `MCP_AUTH_TOKEN` is
   unset or shorter than 32 characters, every request gets `503`.
 - A problem with a call (invalid arguments, a TypeSafe error) comes back as a tool error that says what
-  to fix. Empty input counts as invalid (a state, instructions, a score level or an option name with
-  nothing in it), since TypeSafe would still answer it. In a batch, an empty state only fails its own
-  slot, unless every state is empty.
+  to fix. Empty input counts as invalid, since TypeSafe would still answer it: a state, instructions or
+  a score level with nothing in it, a state that is only the text "null", or an empty option name. In a
+  batch, an empty or `null` state only fails its own slot, unless every state is empty.
 - Every call stops asking TypeSafe after 50 seconds, to answer within the route's 60 second limit, and
   as soon as the client disconnects. A call that runs out of time comes back with an error and can be
   sent again.

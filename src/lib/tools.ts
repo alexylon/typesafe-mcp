@@ -1,7 +1,7 @@
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import type { EntryType, Questions } from '@typesafe-ai/sdk';
 import { z } from 'zod';
-import { batchStateSchema, hasContent, modelSchema, questionsSchema, stateSchema } from '@/lib/questions';
+import { batchStateSchema, isEmptyState, modelSchema, questionsSchema, stateSchema } from '@/lib/questions';
 import { ask, askBatch, describeError, listModels, MAX_BATCH_STATES } from '@/lib/systemOne';
 
 // Leaves time to answer within the route's 60 second limit. Even a single
@@ -73,7 +73,7 @@ export function registerTools(server: McpServer): void {
 					.array(batchStateSchema)
 					.min(1, { error: 'Send at least one state', abort: true })
 					.max(MAX_BATCH_STATES, `Send at most ${MAX_BATCH_STATES} states; split a longer list across calls`)
-					.refine(states => states.some(hasContent), 'Every state is empty; there is nothing to judge')
+					.refine(states => !states.every(isEmptyState), 'Every state is empty; there is nothing to judge')
 					.describe('The items to judge. Each one is a complete state for the questions.'),
 				questions: questionsSchema,
 				model: modelSchema,
