@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_CHOICE_OPTIONS, questionsSchema, stateSchema } from '@/lib/questions';
+import { MAX_CHOICE_OPTIONS, modelSchema, questionsSchema, stateSchema } from '@/lib/questions';
 
 const accepts = (questions: unknown) => questionsSchema.safeParse(questions).success;
 
@@ -113,5 +113,17 @@ describe('stateSchema', () => {
 		expect(stateSchema.safeParse('null').success).toBe(false);
 		expect(stateSchema.safeParse(' null ').success).toBe(false);
 		expect(stateSchema.safeParse({ expression: 'null' }).success).toBe(true);
+	});
+});
+
+describe('modelSchema', () => {
+	it('takes a name or nothing, but not an empty name', () => {
+		expect(modelSchema.safeParse('jev-latest').success).toBe(true);
+		expect(modelSchema.safeParse(undefined).success).toBe(true);
+
+		for (const model of ['', '  ']) {
+			expect(modelSchema.safeParse(model).error?.issues.map(issue => issue.message))
+				.toEqual(['Must not be empty; leave it out to use the server default']);
+		}
 	});
 });

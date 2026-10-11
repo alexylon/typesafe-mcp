@@ -142,12 +142,13 @@ describe('tool definitions', () => {
 		for (const description of descriptions) expect(description.length).toBeLessThan(2048);
 	});
 
-	it('states the question and option counts that the server checks', async () => {
+	it('states the limits that the server checks', async () => {
 		const { tools } = await (await connect()).listTools();
 		const askTool = tools.find(tool => tool.name === 'typesafe_ask');
 
 		expect(askTool?.inputSchema).toMatchObject({
 			properties: {
+				model: { type: 'string', minLength: 1 },
 				questions: {
 					minProperties: 1,
 					additionalProperties: {

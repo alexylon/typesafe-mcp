@@ -148,7 +148,11 @@ export const questionsSchema = z
 		+ 'arrays when definitions, contrasts, exclusions or examples make them clearer.',
 	);
 
+// TypeSafe would answer an empty name with just "Unknown model:". It isn't taken
+// as the default either, so a caller that meant to pick a model finds out.
 export const modelSchema = z
 	.string()
+	.trim()
+	.min(1, 'Must not be empty; leave it out to use the server default')
 	.optional()
 	.describe('Model name. Leave it out to use the server default; typesafe_list_models shows the options.');
