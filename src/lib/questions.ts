@@ -44,8 +44,8 @@ const STATE_DESCRIPTION
 	= 'The content to judge: plain text, or an object or array; not empty. When it has several parts, give '
 	+ 'each a named field, such as a ticket next to the policy that applies to it. Include everything the '
 	+ 'questions need, such as who is involved, how they relate and current facts like today\'s date: the '
-	+ 'model sees nothing else. Work out dates, sums and exact comparisons yourself, include the results and '
-	+ 'point the question at them.';
+	+ 'model sees nothing else. It doesn\'t calculate reliably, so work out sums, dates and exact comparisons '
+	+ 'yourself, such as a day\'s spending against its limit, include the results and point the question at them.';
 
 // null passes the type check so that it gets the same message as the text
 // "null": clients send a missing state either way.
@@ -145,7 +145,8 @@ export const questionsSchema = z
 		'Questions keyed by a name you choose; each answer comes back under the same name. The model '
 		+ 'never sees the names, so the instructions and criteria must carry the whole meaning: the judgment '
 		+ 'goes in the instructions, its possible answers in the criteria. Both are text, or objects or '
-		+ 'arrays when definitions, contrasts, exclusions or examples make them clearer.',
+		+ 'arrays when definitions, contrasts, exclusions or examples make them clearer. Write them in '
+		+ 'English, where the model is most accurate; a state in another language works, but less reliably.',
 	);
 
 // TypeSafe would answer an empty name with just "Unknown model:". It isn't taken
